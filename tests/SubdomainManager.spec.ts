@@ -36,6 +36,11 @@ describe('Subdomain', () => {
             deploy: true,
             success: true,
         });
+        expect(deployResult.transactions).toHaveTransaction({
+            from: subdomainManager.address,
+            to: owner.address,
+            success: true,
+        });
     });
 
     it('should deploy', async () => {});
@@ -89,6 +94,8 @@ describe('Subdomain', () => {
             to: subdomainManager.address,
             success: true,
         });
+        const data = await subdomainManager.getAll();
+        expect(data.get('test')).toBeDefined();
     });
 
     it('should set wallet', async () => {
@@ -98,6 +105,7 @@ describe('Subdomain', () => {
             to: subdomainManager.address,
             success: true,
         });
+
     });
 
     it('should set site', async () => {
@@ -165,5 +173,41 @@ describe('Subdomain', () => {
             to: subdomainManager.address,
             success: true,
         });
+        const data = await subdomainManager.getAll();
+        expect(data.size).toEqual(3);
     });
+
+    it('should delete records', async ()=>{
+        let result = await subdomainManager.sendSetWallet(owner.getSender(), toNano('0.05'), 'test', randomAddress());
+        expect(result.transactions).toHaveTransaction({
+            from: owner.address,
+            to: subdomainManager.address,
+            success: true,
+        });
+
+        const {transactions} = await subdomainManager.sendDelete(owner.getSender(), toNano('0.05'), 'test');
+        printTransactionFees(transactions);
+        expect(transactions).toHaveTransaction({
+            from: owner.address,
+            to: subdomainManager.address,
+            success: true,
+        });
+        const data = await subdomainManager.getAll();
+        expect(data.size).toEqual(0);
+    })
+    it('should delete one record', async ()=>{
+        let result = await subdomainManager.sendSetWallet(owner.getSender(), toNano('0.05'), 'test', randomAddress());
+        expect(result.transactions).toHaveTransaction({
+            from: owner.address,
+            to: subdomainManager.address,
+            success: true,
+        });
+        const {transactions} = await subdomainManager.sendSetWallet(owner.getSender(), toNano('0.05'), 'test', null);
+        printTransactionFees(transactions);
+        expect(transactions).toHaveTransaction({
+            from: owner.address,
+            to: subdomainManager.address,
+            success: true,
+        });
+    })
 });

@@ -1,18 +1,28 @@
 #include "imports/stdlib.fc";
 
 const int op::update_record = 0x537a3491;
+const int op::delete_record = 0x537a3492;
+const int op::deploy = 0x12345678;
 
 global slice owner;
 global cell domains;
+
+
+
+int str_hash(slice s) inline {
+    int hash = s.preload_uint(s.slice_bits());
+    return hash;
+}
 ;; sends rest of funds back to the sender
-() pong_funds_back(slice sender) impure inline_ref {
+() pong_funds_back(slice sender, int comment, int comment_length) impure {
+    raw_reserve(15000000, 0); ;; reserve 0.015 TON
     var msg = begin_cell()
         .store_uint(0x18, 6)
         .store_slice(sender)
         .store_coins(0)
         .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
-        .store_uint("ok"u, 32 + 16); ;; 32 - empty payload, 16 - comment
-    send_raw_message(msg.end_cell(), 64 | 2);
+        .store_uint(comment, 32 + comment_length); ;; 32 - empty payload, 16 - comment
+    send_raw_message(msg.end_cell(), 128 | 2); ;; send remaining balance, ignore if failed
 }
 
 () load_data () impure {
@@ -36,24 +46,48 @@ global cell domains;
     throw_unless(501, equal_slices(sender, owner));
 
     if (in_msg_body.slice_empty?()) {
+        throw(130);
         return ();
     }
 
     int op = in_msg_body~load_uint(32);
 
+    if (op == op::deploy){
+        pong_funds_back(sender, "deployed"u, 8 * 8);
+        return ();
+    }
     if (op == op::update_record) {
         slice domain = in_msg_body~load_ref().begin_parse();
-        (cell records, _) = domains.udict_get_ref?(256, string_hash(domain));
+        int hash = str_hash(domain);
+        (cell records, _) = domains.udict_get_ref?(256, hash);
+        ~dump(1);
         int key = in_msg_body~load_uint(256);
+        ~dump(2);
         if (in_msg_body~load_uint(1) == 1) {
+            ~dump(3);
             cell value = in_msg_body~load_ref();
             records~udict_set_ref(256, key, value);
         } else {
             records~udict_delete?(256, key);
         }
-        domains~udict_set_ref(256, string_hash(domain), records);
+        if(records.dict_empty?()){
+            domains~udict_delete?(256, hash);
+            pong_funds_back(sender, "deleted"u, 7 * 8);
+        }
+        else {
+            domains~udict_set_ref(256, hash, records);
+            pong_funds_back(sender, "saved"u, 5 * 8);
+        }
         save_data();
-        pong_funds_back(sender);
+        return ();
+    }
+    if(op == op::delete_record){
+        slice domain = in_msg_body~load_ref().begin_parse();
+        int hash = str_hash(domain);
+        domains~udict_delete?(256, hash);
+
+        save_data();
+        pong_funds_back(sender, "deleted"u, 7 * 8);
         return ();
     }
     throw(130);
@@ -66,7 +100,10 @@ global cell domains;
     subdomain~skip_last_bits(slice_bits(subdomain_sfx));
     return (subdomain, subdomain_sfx);
 }
-
+(cell) all() method_id {
+    load_data();
+    return domains;
+}
 (int, cell) dnsresolve (slice subdomain, int category) method_id {
     int subdomain_bits = slice_bits(subdomain);
     throw_unless(70, subdomain_bits % 8 == 0);
@@ -81,7 +118,7 @@ global cell domains;
     int subdomain_suffix_bits = slice_bits(subdomain_suffix);
 
     load_data();
-    (cell records, _) = domains.udict_get_ref?(256, string_hash(subdomain));
+    (cell records, _) = domains.udict_get_ref?(256, str_hash(subdomain));
 
     if (subdomain_suffix_bits > 0) { ;; more than "<SUBDOMAIN>\0" requested
         category = "dns_next_resolver"H;

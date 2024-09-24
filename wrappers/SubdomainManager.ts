@@ -1,10 +1,29 @@
 import { Address, beginCell, Cell, Contract, contractAddress, ContractProvider, Sender, SendMode } from '@ton/core';
+import { Dictionary } from '@ton/core';
+import { ADNLAddress } from 'ton';
 
 export type SubdomainManagerConfig = {
     owner: Address;
     domains?: Cell;
     seed?: bigint;
 };
+
+export interface DnsData {
+    wallet: Address | null;
+    storage: null | unknown;
+    site: ADNLAddress | unknown | null;
+    next_resolver: Address | null;
+}
+
+function keyToString(key: bigint) {
+    const c = beginCell().storeUint(key, 256);
+    const slice = c.endCell().beginParse();
+    const ans = slice.loadStringTail();
+    return ans
+        .split('')
+        .filter((e) => e != '\0')
+        .join('');
+}
 
 export function subdomainManagerConfigToCell(config: SubdomainManagerConfig): Cell {
     return beginCell()
@@ -40,8 +59,23 @@ export class SubdomainManager implements Contract {
         await provider.internal(via, {
             value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
-            body: beginCell().endCell(),
+            body: beginCell().storeUint(0x12345678, 32).endCell(),
         });
+    }
+
+    async getAll(provider: ContractProvider): Promise<Map<string, Partial<DnsData>>> {
+        const data = await provider.get('all', []);
+        const ans = data.stack.readCellOpt();
+        if (!ans) return new Map();
+        const dict = ans.beginParse().loadDictDirect(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell());
+        const result = new Map<string, Partial<DnsData>>();
+        for (const key of dict.keys()) {
+            const string = keyToString(key);
+            //TODO
+            // const value = loadAllEntries(dict.get(key)!);
+            result.set(string, {});
+        }
+        return result;
     }
 
     async getResolve(provider: ContractProvider, subdomain: string, category: bigint): Promise<[number, Cell]> {
@@ -100,15 +134,36 @@ export class SubdomainManager implements Contract {
             beginCell().storeUint(0xba93, 16).storeAddress(resolver).endCell()
         );
     }
+    async sendDelete(
+        provider: ContractProvider,
+        via: Sender,
+        value: bigint,
+        domain: string
+    ) {
+        await provider.internal(via, {
+            value,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell()
+                .storeUint(0x537a3492, 32)
+                .storeRef(beginCell().storeStringTail(domain).storeUint(0, 8).endCell())
+                .endCell(),
+        });
+    }
 
-    async sendSetWallet(provider: ContractProvider, via: Sender, value: bigint, domain: string, wallet: Address) {
+    async sendSetWallet(
+        provider: ContractProvider,
+        via: Sender,
+        value: bigint,
+        domain: string,
+        wallet: Address | null
+    ) {
         await this.sendUpdate(
             provider,
             via,
             value,
             domain,
             BigInt('0xe8d44050873dba865aa7c170ab4cce64d90839a34dcfd6cf71d14e0205443b1b'),
-            beginCell().storeUint(0x9fd3, 16).storeAddress(wallet).storeUint(0, 8).endCell()
+            wallet ? beginCell().storeUint(0x9fd3, 16).storeAddress(wallet).storeUint(0, 8).endCell() : undefined
         );
     }
 
