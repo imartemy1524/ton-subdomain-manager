@@ -1,10 +1,9 @@
-import { Blockchain, SandboxContract, TreasuryContract } from '@ton-community/sandbox';
-import { Cell, beginCell, toNano } from 'ton-core';
+import { Blockchain, printTransactionFees, SandboxContract, TreasuryContract } from '@ton/sandbox';
+import { Cell, beginCell, toNano } from '@ton/core';
 import { SubdomainManager } from '../wrappers/SubdomainManager';
-import '@ton-community/test-utils';
-import { compile } from '@ton-community/blueprint';
-import { randomAddress } from '@ton-community/test-utils';
+import { compile } from '@ton/blueprint';
 import { randomBytes } from 'crypto';
+import { randomAddress } from '@ton/test-utils';
 
 describe('Subdomain', () => {
     let code: Cell;
@@ -31,7 +30,6 @@ describe('Subdomain', () => {
         );
 
         const deployResult = await subdomainManager.sendDeploy(owner.getSender(), toNano('0.05'));
-
         expect(deployResult.transactions).toHaveTransaction({
             from: owner.address,
             to: subdomainManager.address,
@@ -50,9 +48,15 @@ describe('Subdomain', () => {
             1n,
             beginCell().storeUint(123, 64).endCell()
         );
+        printTransactionFees(result.transactions);
         expect(result.transactions).toHaveTransaction({
             from: owner.address,
             to: subdomainManager.address,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: subdomainManager.address,
+            to: owner.address,
             success: true,
         });
     });

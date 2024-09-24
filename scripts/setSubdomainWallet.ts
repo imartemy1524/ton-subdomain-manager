@@ -1,6 +1,6 @@
 import { Address, toNano } from 'ton-core';
 import { SubdomainManager } from '../wrappers/SubdomainManager';
-import { NetworkProvider } from '@ton-community/blueprint';
+import { NetworkProvider } from '@ton/blueprint';
 
 export async function run(provider: NetworkProvider) {
     const subdomainManager = provider.open(
