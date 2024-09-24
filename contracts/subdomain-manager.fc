@@ -60,11 +60,8 @@ int str_hash(slice s) inline {
         slice domain = in_msg_body~load_ref().begin_parse();
         int hash = str_hash(domain);
         (cell records, _) = domains.udict_get_ref?(256, hash);
-        ~dump(1);
         int key = in_msg_body~load_uint(256);
-        ~dump(2);
         if (in_msg_body~load_uint(1) == 1) {
-            ~dump(3);
             cell value = in_msg_body~load_ref();
             records~udict_set_ref(256, key, value);
         } else {

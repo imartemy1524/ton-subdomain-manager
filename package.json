@@ -2,7 +2,8 @@
     "name": "simple-subdomain",
     "license": "MIT",
     "scripts": {
-        "test": "jest"
+        "test": "jest",
+        "build": "blueprint build"
     },
     "devDependencies": {
         "@types/jest": "^29.5.0",
@@ -16,7 +17,7 @@
         "typescript": "^4.9.5"
     },
     "dependencies": {
-        "@ton/blueprint": "^0.24.0",
+        "@ton/blueprint": "^0.20.0",
         "@ton/core": "^0.58.1",
         "@ton/sandbox": "^0.22.0",
         "@ton/test-utils": "^0.4.2"
